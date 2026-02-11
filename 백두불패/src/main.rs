@@ -10,12 +10,9 @@ fn lexer(raw: String) -> Vec<Token> {
     let iter: Vec<char> = raw.chars().collect();
     let mut index = 0;
     let mut result = Vec::new();
+    let mut keyword = String::new();
     loop {
-        let mut keyword = String::new();
-        if peek(&iter, &mut index, "함수마당 ") {
-            result.push(Token::Function);
-            continue;
-        } else if peek(&iter, &mut index, "<") {
+        if peek(&iter, &mut index, "<") {
             flush_keyword(&mut keyword, &mut result);
             result.push(Token::TriangleOpen);
             continue;
@@ -26,12 +23,8 @@ fn lexer(raw: String) -> Vec<Token> {
         } else if peek(&iter, &mut index, "->") {
             result.push(Token::ReturnType);
             continue;
-        } else if peek(&iter, &mut index, "장군님께_뜻_올려드리기 ") {
-            result.push(Token::Return);
-            continue;
         } else if peek(&iter, &mut index, " ") || peek(&iter, &mut index, "\n") {
             flush_keyword(&mut keyword, &mut result);
-            result.push(Token::WhiteSpace);
             continue;
         } else if peek(&iter, &mut index, ";") {
             flush_keyword(&mut keyword, &mut result);
@@ -39,6 +32,24 @@ fn lexer(raw: String) -> Vec<Token> {
             continue;
         } else if peek(&iter, &mut index, "(") {
             flush_keyword(&mut keyword, &mut result);
+            result.push(Token::GoalHoOpen);
+            continue;
+        } else if peek(&iter, &mut index, ")") {
+            flush_keyword(&mut keyword, &mut result);
+            result.push(Token::GoalHoClose);
+            continue;
+        } else if peek(&iter, &mut index, "{") {
+            flush_keyword(&mut keyword, &mut result);
+            result.push(Token::MiddleGoalHoOpen);
+            continue;
+        } else if peek(&iter, &mut index, "}") {
+            flush_keyword(&mut keyword, &mut result);
+            result.push(Token::MiddleGoalHoClose);
+            continue;
+        } else if peek(&iter, &mut index, "만약 장군님 뜻대로라면 ") {
+            flush_keyword(&mut keyword, &mut result);
+            result.push(Token::MiddleGoalHoClose);
+            continue;
         } else if peek(&iter, &mut index, "\"") {
             let mut string = String::new();
             loop {
@@ -59,7 +70,6 @@ fn lexer(raw: String) -> Vec<Token> {
         } else if let Some(ch) = iter.get(index) {
             keyword.push(*ch);
             index += 1;
-            continue;
         } else {
             return result;
         }
@@ -67,7 +77,71 @@ fn lexer(raw: String) -> Vec<Token> {
 }
 fn flush_keyword(buffer: &mut String, result: &mut Vec<Token>) {
     if !buffer.is_empty() {
-        result.push(Token::KeyWord(std::mem::take(buffer)));
+        match buffer.as_str() {
+            "함수마당" => {
+                result.push(Token::Function);
+            }
+            "장군님께뜻올려드리기" => {
+                result.push(Token::ReturnType);
+            }
+            "만약장군님뜻대로라면" => {
+                result.push(Token::If);
+            }
+            "장군님의뜻이아니라면다시감사하기" => result.push(Token::ElIf),
+            "장군님판단에따라" => {
+                result.push(Token::Else);
+            }
+            "충성반복" => {
+                result.push(Token::Loop);
+            }
+            "장군님지시가이어지는동안" => {
+                result.push(Token::While);
+            }
+            "장군님지시에따라" => {
+                result.push(Token::For);
+            }
+            "충성스럽게하나씩" => {
+                result.push(Token::In);
+            }
+            "위대하신장군님의명으로멈춤" => {
+                result.push(Token::Break);
+            }
+            "충성하며계속" => {
+                result.push(Token::Continue);
+            }
+            "장군님은혜로사용" => {
+                result.push(Token::Use);
+            }
+            "장군님이열거하신위대한종류" => {
+                result.push(Token::Enum);
+            }
+            "장군님식구조" => {
+                result.push(Token::Struct);
+            }
+            "위대하신장군님뜻대로기능붙히기" => {
+                result.push(Token::Impl);
+            }
+            "장군님께서이름을하사하시다" => {
+                result.push(Token::Let);
+            }
+            "장군님께서정하신고정값" => {
+                result.push(Token::Const);
+            }
+            "장군님이강조하신주체적인값" => {
+                result.push(Token::Static);
+            }
+            "장군님의기겟말" => {
+                result.push(Token::Asm);
+            }
+            "장군님의선택에따른경우" => {
+                result.push(Token::Match);
+            }
+
+            _ => {
+                result.push(Token::KeyWord(std::mem::take(buffer)));
+            }
+        }
+        buffer.clear();
     }
 }
 #[derive(Debug)]
@@ -76,10 +150,30 @@ enum Token {
     TriangleOpen,
     TriangleClose,
     KeyWord(String),
-    WhiteSpace,
     ReturnType,
     GoalHoOpen,
     GoalHoClose,
+    MiddleGoalHoOpen,
+    MiddleGoalHoClose,
+    If,
+    Else,
+    ElIf,
+    Loop,
+    While,
+    For,
+    In,
+    Break,
+    Continue,
+    Use,
+    Enum,
+    Struct,
+    Impl,
+    Let,
+    Bstr(Vec<u8>),
+    Static,
+    Const,
+    Asm,
+    Match,
     Return,
     SemiColumn,
     Str(String),
