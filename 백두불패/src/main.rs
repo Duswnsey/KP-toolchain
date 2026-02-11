@@ -46,10 +46,6 @@ fn lexer(raw: String) -> Vec<Token> {
             flush_keyword(&mut keyword, &mut result);
             result.push(Token::MiddleGoalHoClose);
             continue;
-        } else if peek(&iter, &mut index, "만약 장군님 뜻대로라면 ") {
-            flush_keyword(&mut keyword, &mut result);
-            result.push(Token::MiddleGoalHoClose);
-            continue;
         } else if peek(&iter, &mut index, "\"") {
             let mut string = String::new();
             loop {
@@ -82,12 +78,12 @@ fn flush_keyword(buffer: &mut String, result: &mut Vec<Token>) {
                 result.push(Token::Function);
             }
             "장군님께뜻올려드리기" => {
-                result.push(Token::ReturnType);
+                result.push(Token::Return);
             }
             "만약장군님뜻대로라면" => {
                 result.push(Token::If);
             }
-            "장군님의뜻이아니라면다시감사하기" => result.push(Token::ElIf),
+            "장군님이불만족하시면다시감사하기" => result.push(Token::ElIf),
             "장군님판단에따라" => {
                 result.push(Token::Else);
             }
@@ -130,7 +126,7 @@ fn flush_keyword(buffer: &mut String, result: &mut Vec<Token>) {
             "장군님이강조하신주체적인값" => {
                 result.push(Token::Static);
             }
-            "장군님의기겟말" => {
+            "장군님의기계말" => {
                 result.push(Token::Asm);
             }
             "장군님의선택에따른경우" => {
