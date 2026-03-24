@@ -1,10 +1,140 @@
-use std::{fs::read_link, io::Read, str::Chars};
+use std::io::Read;
 
 fn main() {
     let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input);
+    let _ = std::io::stdin().read_to_string(&mut input);
     let token_tree = lexer(input);
     println!("{:#?}", token_tree);
+    let mut index = 0;
+    let ast = parser(&token_tree, &mut index, true);
+    println!("{:#?}", ast);
+}
+fn parser(token_tree: &Vec<Token>, index: &mut usize, top: bool) -> Vec<Element> {
+    let mut result: Ast = Vec::new();
+    while let Some(token) = token_tree.get(*index) {
+        *index += 1;
+        match token {
+            Token::Function => {
+                let name = if let Some(Token::KeyWord(name)) = token_tree.get(*index) {
+                    name
+                } else {
+                    panic!();
+                };
+                *index += 1;
+                if token_tree.get(*index) != Some(&Token::GoalHoOpen) {
+                    panic!();
+                }
+                *index += 1;
+                let mut arguments = Vec::with_capacity(5); //Heap
+                loop {
+                    if Some(&Token::GoalHoClose) == token_tree.get(*index) {
+                        *index += 1;
+                        break;
+                    }
+                    let name = if let Some(Token::KeyWord(name)) = token_tree.get(*index) {
+                        name
+                    } else {
+                        panic!();
+                    };
+                    *index += 1;
+                    if token_tree.get(*index) != Some(&Token::Column) {
+                        panic!();
+                    }
+                    *index += 1;
+                    let typee = get_type(&token_tree, index, 0);
+                    arguments.push((name.clone(), typee));
+                    if Some(&Token::GoalHoClose) == token_tree.get(*index) {
+                        *index += 1;
+                        break;
+                    } else if Some(&Token::Comma) != token_tree.get(*index) {
+                        panic!();
+                    }
+                    *index += 1;
+                }
+                let return_type = if token_tree.get(*index) == Some(&Token::ReturnType) {
+                    *index += 1;
+                    Some(get_type(&token_tree, index, 0))
+                } else {
+                    None
+                };
+                let scope = if token_tree.get(*index) == Some(&Token::MiddleGoalHoOpen) {
+                    *index += 1;
+                    parser(&token_tree, index, false)
+                } else {
+                    panic!();
+                };
+                result.push(Element::Function(Function {
+                    name: name.to_string(),
+                    argument: arguments,
+                    return_type: return_type,
+                    code: scope,
+                }));
+            }
+            Token::MiddleGoalHoClose => {
+                if !top {
+                    *index += 1;
+                    return result;
+                }
+            }
+            _ => {}
+        }
+    }
+    if !top {
+        panic!("동무한테 실망했다우");
+    }
+    result
+}
+fn get_type(tree: &Vec<Token>, index: &mut usize, offset: usize) -> Type {
+    let mut result;
+    match tree.get(*index + offset) {
+        Some(Token::KeyWord(name)) => {
+            result = Type::Other(name.to_string());
+            *index += 1;
+        }
+        Some(Token::GoalHoOpen) => {
+            *index += 1;
+            result = Type::Tuple(Vec::new());
+            loop {
+                if let Type::Tuple(ref mut tup) = result {
+                    tup.push(get_type(tree, index, 0));
+                }
+                match tree.get(*index + offset) {
+                    Some(Token::GoalHoClose) => {
+                        *index += 1;
+                        break;
+                    }
+                    Some(Token::Comma) => {
+                        *index += 1;
+                        continue;
+                    }
+                    _ => {
+                        panic!()
+                    }
+                }
+            }
+        }
+        _ => {
+            panic!()
+        }
+    }
+    result
+}
+type Ast = Vec<Element>;
+#[derive(Debug)]
+enum Element {
+    Function(Function),
+}
+#[derive(Debug)]
+enum Type {
+    Tuple(Vec<Type>),
+    Other(String),
+}
+#[derive(Debug)]
+struct Function {
+    argument: Vec<(String, Type)>,
+    name: String,
+    code: Ast,
+    return_type: Option<Type>,
 }
 fn lexer(raw: String) -> Vec<Token> {
     let iter: Vec<char> = raw.chars().collect();
@@ -46,6 +176,12 @@ fn lexer(raw: String) -> Vec<Token> {
             flush_keyword(&mut keyword, &mut result);
             result.push(Token::MiddleGoalHoClose);
             continue;
+        } else if peek(&iter, &mut index, ":") {
+            flush_keyword(&mut keyword, &mut result);
+            result.push(Token::Column);
+        } else if peek(&iter, &mut index, ",") {
+            flush_keyword(&mut keyword, &mut result);
+            result.push(Token::Comma);
         } else if peek(&iter, &mut index, "\"") {
             let mut string = String::new();
             loop {
@@ -140,7 +276,7 @@ fn flush_keyword(buffer: &mut String, result: &mut Vec<Token>) {
         buffer.clear();
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Token {
     Function,
     TriangleOpen,
@@ -172,11 +308,13 @@ enum Token {
     Match,
     Return,
     SemiColumn,
+    Column,
     Str(String),
     Ignore(char),
+    Comma,
 }
 fn peek(array: &Vec<char>, index: &mut usize, str: &str) -> bool {
-    let mut index_failback = index.clone();
+    let index_failback = index.clone();
     for i in str.chars() {
         if array.get(*index) == Some(&i) {
             *index += 1;
