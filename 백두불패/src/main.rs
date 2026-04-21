@@ -14,74 +14,17 @@ fn main() {
     println!("{:#?}", ast);
 }
 fn parser(token_tree: &Vec<Token>, index: &mut usize, top: bool) -> Vec<Element> {
-    let mut result: Ast = Vec::new();
-    while let Some(token) = token_tree.get(*index) {
-        *index += 1;
-        match token {
-            Token::Function => {
-                let name = if let Some(Token::KeyWord(name)) = token_tree.get(*index) {
-                    name
-                } else {
-                    panic!();
-                };
-                *index += 1;
-                if token_tree.get(*index) != Some(&Token::GoalHoOpen) {
-                    panic!();
-                }
-                *index += 1;
-                let mut arguments = Vec::with_capacity(5); //Heap
-                loop {
-                    if Some(&Token::GoalHoClose) == token_tree.get(*index) {
-                        *index += 1;
-                        break;
-                    }
-                    let name = if let Some(Token::KeyWord(name)) = token_tree.get(*index) {
-                        name
-                    } else {
-                        panic!();
-                    };
-                    *index += 1;
-                    if token_tree.get(*index) != Some(&Token::Column) {
-                        panic!();
-                    }
-                    *index += 1;
-                    let typee = get_pattern(&token_tree, index);
-                    arguments.push((name.clone(), typee));
-                    if Some(&Token::GoalHoClose) == token_tree.get(*index) {
-                        *index += 1;
-                        break;
-                    } else if Some(&Token::Comma) != token_tree.get(*index) {
-                        panic!();
-                    }
-                    *index += 1;
-                }
-                let return_type = if token_tree.get(*index) == Some(&Token::ReturnType) {
-                    *index += 1;
-                    Some(get_pattern(&token_tree, index))
-                } else {
-                    None
-                };
-                let scope = if token_tree.get(*index) == Some(&Token::MiddleGoalHoOpen) {
-                    *index += 1;
-                    parser(&token_tree, index, false)
-                } else {
-                    panic!();
-                };
-                result.push(Element::Function {
-                    name: name.to_string(),
-                    argument: arguments,
-                    return_type: return_type,
-                    code: scope,
-                });
-            }
-            Token::MiddleGoalHoClose => {
-                if !top {
-                    *index += 1;
-                    return result;
-                }
+    let mut result = Vec::new();
+    while token_tree.get(*index) != None {
+        if !top && token_tree.get(*index) == Some(&Token::MiddleGoalHoClose) {
+            *index += 1;
+            return result;
+        }
+        match get_statement(token_tree, index) {
+            Some(element) => {
+                result.push(element);
             }
             _ => {
-                *index -= 1;
                 let value = get_expression(token_tree, index, 0, true);
                 if token_tree.get(*index) == Some(&Token::SemiColumn) {
                     *index += 1;
@@ -92,10 +35,105 @@ fn parser(token_tree: &Vec<Token>, index: &mut usize, top: bool) -> Vec<Element>
             }
         }
     }
-    if !top {
-        panic!("동무한테 실망했다우");
-    }
     result
+}
+fn get_statement(token_tree: &Vec<Token>, index: &mut usize) -> Option<Element> {
+    let Some(token) = token_tree.get(*index) else {
+        panic!()
+    };
+    *index += 1;
+    match token {
+        Token::Function => {
+            let name = if let Some(Token::KeyWord(name)) = token_tree.get(*index) {
+                name
+            } else {
+                panic!();
+            };
+            *index += 1;
+            if token_tree.get(*index) != Some(&Token::GoalHoOpen) {
+                panic!();
+            }
+            *index += 1;
+            let mut arguments = Vec::with_capacity(5); //Heap
+            loop {
+                if Some(&Token::GoalHoClose) == token_tree.get(*index) {
+                    *index += 1;
+                    break;
+                }
+                let name = if let Some(Token::KeyWord(name)) = token_tree.get(*index) {
+                    name
+                } else {
+                    panic!();
+                };
+                *index += 1;
+                if token_tree.get(*index) != Some(&Token::Column) {
+                    panic!();
+                }
+                *index += 1;
+                let typee = get_pattern(&token_tree, index);
+                arguments.push((name.clone(), typee));
+                if Some(&Token::GoalHoClose) == token_tree.get(*index) {
+                    *index += 1;
+                    break;
+                } else if Some(&Token::Comma) != token_tree.get(*index) {
+                    panic!();
+                }
+                *index += 1;
+            }
+            let return_type = if token_tree.get(*index) == Some(&Token::ReturnType) {
+                *index += 1;
+                Some(get_pattern(&token_tree, index))
+            } else {
+                None
+            };
+            let scope = if token_tree.get(*index) == Some(&Token::MiddleGoalHoOpen) {
+                if let Expression::Scope(scope) = get_expression(token_tree, index, 0, false) {
+                    Some(scope)
+                } else {
+                    panic!()
+                }
+            } else {
+                None
+            };
+            return Some(Element::Function {
+                name: name.to_string(),
+                argument: arguments,
+                return_type: return_type,
+                code: scope,
+            });
+        }
+        Token::Clang => {
+            let mut elements = Vec::new();
+            if token_tree.get(*index) != Some(&Token::MiddleGoalHoOpen) {
+                panic!()
+            }
+
+            *index += 1;
+            loop {
+                if token_tree.get(*index) == Some(&Token::MiddleGoalHoClose) {
+                    *index += 1;
+                    break;
+                }
+                let item = get_statement(token_tree, index);
+                if !matches!(item, Some(Element::Function{name:_,return_type:_,argument:_, code:_})) {
+                    panic!();
+                }
+                if token_tree.get(*index) != Some(&Token::SemiColumn) {
+                    panic!()
+                }
+                *index += 1;
+                
+                elements.push(item?);
+                
+            }
+return Some(Element::Clang(elements));
+        }
+        _ => {
+            *index -= 1;
+            return None;
+        }
+    }
+    None
 }
 fn get_pattern(tree: &[Token], index: &mut usize) -> Pattern {
     Pattern::NotImplementedPattern
@@ -106,7 +144,6 @@ fn get_expression(tree: &Vec<Token>, index: &mut usize, offset: usize, full: boo
         Some(Token::KeyWord(name)) => {
             *index += 1;
             if tree.get(*index) == Some(&Token::GoalHoOpen) {
-                
                 let arguments: Vec<Expression> =
                     if let Expression::Tuple(tup) = get_expression(tree, index, 0, false) {
                         tup.clone()
@@ -143,6 +180,10 @@ fn get_expression(tree: &Vec<Token>, index: &mut usize, offset: usize, full: boo
                     }
                 }
             }
+        }
+        Some(Token::MiddleGoalHoOpen) => {
+            *index += 1;
+            result = Expression::Scope(parser(tree, index, false));
         }
         Some(Token::Str(string)) => {
             *index += 1;
@@ -230,20 +271,21 @@ enum CalculationType {
     Square,
     Equal,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Pattern {
     NotImplementedPattern,
 }
 type Ast = Vec<Element>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Element {
     //statement
     Function {
         argument: Vec<(String, Pattern)>,
         name: String,
-        code: Ast,
+        code: Option<Ast>,
         return_type: Option<Pattern>,
     },
+    Clang(Vec<Element>),
     Expose(Expression),
     Thatsit(Expression),
 }
@@ -257,6 +299,11 @@ enum Expression {
     // 사슬 함수로 변환할 예정
     // 사슬함수에서 연산자를 호출하는것도 사칙 련산이 적용되기 때문 */
     Calculation(CalculationType, Box<Expression>, Box<Expression>),
+    Scope(Ast),
+    If {
+        r#if: (Box<Expression>, Ast),
+        elif: Option<(Box<Expression>, Ast)>,
+    },
 }
 
 fn lexer(raw: String) -> Vec<Token> {
@@ -409,7 +456,10 @@ fn flush_keyword(buffer: &mut String, result: &mut Vec<Token>) {
             "장군님의선택에따른경우" => {
                 result.push(Token::Match);
             }
-
+            "clang" => {
+                //C언어 생 프로그람 호출소
+                result.push(Token::Clang);
+            }
             _ => {
                 result.push(Token::KeyWord(std::mem::take(buffer)));
             }
@@ -419,6 +469,11 @@ fn flush_keyword(buffer: &mut String, result: &mut Vec<Token>) {
 }
 #[derive(Debug, PartialEq)]
 enum Token {
+    Add,
+    Asm,
+    Bstr(Vec<u8>),
+    Clang,
+    Const,
     Function,
     TriangleOpen,
     TriangleClose,
@@ -442,10 +497,7 @@ enum Token {
     Struct,
     Impl,
     Let,
-    Bstr(Vec<u8>),
     Static,
-    Const,
-    Asm,
     Match,
     Return,
     SemiColumn,
@@ -456,7 +508,6 @@ enum Token {
     Dot,
     Multifly,
     Square,
-    Add,
     Equal,
 }
 //문자열 엿보는 도우미 함수마당
