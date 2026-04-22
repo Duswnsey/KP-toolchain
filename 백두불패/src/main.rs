@@ -115,25 +115,31 @@ fn get_statement(token_tree: &Vec<Token>, index: &mut usize) -> Option<Element> 
                     break;
                 }
                 let item = get_statement(token_tree, index);
-                if !matches!(item, Some(Element::Function{name:_,return_type:_,argument:_, code:_})) {
+                if !matches!(
+                    item,
+                    Some(Element::Function {
+                        name: _,
+                        return_type: _,
+                        argument: _,
+                        code: _
+                    })
+                ) {
                     panic!();
                 }
                 if token_tree.get(*index) != Some(&Token::SemiColumn) {
                     panic!()
                 }
                 *index += 1;
-                
+
                 elements.push(item?);
-                
             }
-return Some(Element::Clang(elements));
+            return Some(Element::Clang(elements));
         }
         _ => {
             *index -= 1;
             return None;
         }
     }
-    None
 }
 fn get_pattern(tree: &[Token], index: &mut usize) -> Pattern {
     Pattern::NotImplementedPattern
@@ -180,6 +186,54 @@ fn get_expression(tree: &Vec<Token>, index: &mut usize, offset: usize, full: boo
                     }
                 }
             }
+        }
+        Some(Token::If) => {
+            *index += 1;
+            let condition = get_expression(tree, index, 0, true);
+            let Expression::Scope(scope) = (if tree.get(*index) != Some(&Token::MiddleGoalHoOpen) {
+                panic!()
+            } else {
+                get_expression(tree, index, 0, false)
+            }) else {
+                panic!()
+            };
+            let mut else_if = None;
+            loop {
+                if tree.get(*index) != Some(&Token::ElIf) {
+                    break;
+                } else if else_if == None {
+                    else_if = Some(Vec::new());
+                }
+                *index += 1;
+                let condition = get_expression(tree, index, 0, true);
+                let Expression::Scope(scope) = (if tree.get(*index) != Some(&Token::MiddleGoalHoOpen)
+                {
+                    panic!()
+                } else {
+                    get_expression(tree, index, 0, false)
+                }) else {
+                    panic!()
+                };
+                else_if.as_mut().unwrap().push((condition, scope));
+            }
+            let mut r#else = None;
+            if tree.get(*index) == Some(&Token::Else) {
+                *index += 1;
+                let Expression::Scope(scope) = (if tree.get(*index) != Some(&Token::MiddleGoalHoOpen)
+                {
+                    panic!()
+                } else {
+                    get_expression(tree, index, 0, false)
+                }) else {
+                    panic!()
+                };
+                r#else = Some(scope);
+            }
+            result = Expression::If {
+                r#if: (Box::new(condition), scope),
+                elif: else_if,
+                r#else: r#else,
+            };
         }
         Some(Token::MiddleGoalHoOpen) => {
             *index += 1;
@@ -264,19 +318,19 @@ impl CalculationType {
         }
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum CalculationType {
     Add,
     Multiply,
     Square,
     Equal,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Pattern {
     NotImplementedPattern,
 }
 type Ast = Vec<Element>;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Element {
     //statement
     Function {
@@ -289,7 +343,7 @@ enum Element {
     Expose(Expression),
     Thatsit(Expression),
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Expression {
     Tuple(Vec<Expression>),
     Other(String),
@@ -302,7 +356,8 @@ enum Expression {
     Scope(Ast),
     If {
         r#if: (Box<Expression>, Ast),
-        elif: Option<(Box<Expression>, Ast)>,
+        elif: Option<Vec<(Expression, Ast)>>,
+        r#else: Option<Ast>,
     },
 }
 
